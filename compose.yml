@@ -58,6 +58,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       LLM_LANGUAGE: Japanese
+      # 1 分あたりに AI を呼ぶ回数の上限。1 書類で 5 回呼ぶ。Gemini の無料枠（1 分 15 回）なら 10 にする
+      LLM_REQUESTS_PER_MINUTE: ${LLM_REQUESTS_PER_MINUTE:-120}
       AUTO_TAG: paperless-gpt-auto    # このタグが付いた書類を AI が処理する
       AUTO_TAG_COMPLETE: ""
       FAIL_TAG: 要確認
