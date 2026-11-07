@@ -49,7 +49,7 @@ python3 tests/make_sample_pdf.py /tmp/notice.pdf
 TASK=$(curl -s -H "$H" -F document=@/tmp/notice.pdf $API/documents/post_document/ | tr -d '"')
 DOC=""
 for i in $(seq 1 60); do
-  DOC=$(curl -s -H "$H" "$API/tasks/?task_id=$TASK" | python3 -c 'import json,sys; t=json.load(sys.stdin); t=t[0] if t else {}; print(t.get("related_document") or "")')
+  DOC=$(curl -s -H "$H" "$API/tasks/?task_id=$TASK" | python3 -c 'import json,sys; t=json.load(sys.stdin); t=t.get("results", []) if isinstance(t, dict) else t; t=t[0] if t else {}; print(t.get("related_document") or "")')
   [ -n "$DOC" ] && break
   sleep 5
 done
