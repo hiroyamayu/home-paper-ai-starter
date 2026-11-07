@@ -19,10 +19,10 @@ step "Paperless を起動（初回は日本語の OCR データを入れるの�
 $DC up -d broker webserver mock
 for i in $(seq 1 120); do
   code=$(curl -s -o /dev/null -w '%{http_code}' $API/ || true)
-  [ "$code" = "401" ] || [ "$code" = "200" ] && break
+  case "$code" in 200|302|401) break ;; esac   # ログインしていないと 302 か 401 が返る
   sleep 5
 done
-[ "$code" = "401" ] || [ "$code" = "200" ] || fail "Paperless が起動しない（$code）"
+case "$code" in 200|302|401) ;; *) fail "Paperless が起動しない（$code）" ;; esac
 
 step "API トークンを作る"
 TOKEN=""
