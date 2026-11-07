@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     depends_on: [broker]
     ports:
-      - "8000:8000"   # 家の LAN から http://<サーバーの IP>:8000 で開く
+      - "${PAPERLESS_PORT:-8000}:8000"   # 家の LAN から http://<サーバーの IP>:8000 で開く
     volumes:
       - ./paperless/data:/usr/src/paperless/data
       - ./paperless/media:/usr/src/paperless/media
@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
     depends_on: [webserver]
     ports:
-      - "127.0.0.1:8080:8080"   # 画面には認証が無いので、サーバー自身からだけ開けるようにする
+      - "127.0.0.1:${PAPERLESS_GPT_PORT:-8080}:8080"   # 画面には認証が無いので、サーバー自身からだけ開けるようにする
     volumes:
       - ./prompts:/app/prompts
       - ./paperless-gpt/db:/app/db
