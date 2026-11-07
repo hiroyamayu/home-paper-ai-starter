@@ -50,6 +50,10 @@ docker compose up -d paperless-gpt
 - スマホからは、Paperless 対応のアプリ（Paperless Mobile など）でアップロードできます
 - **AI に名付けさせたくない書類は `paperless/consume/private/` に入れます。**名付けにも、予定の取り出しにも使いません
 
+### 作り物のプリントで試す
+
+`samples/` に、作り物のプリント（学年だより・行事予定表・給食献立表・家電の説明書など）を入れてあります。自分の家の書類を入れる前に、これで試せます（[samples/README.md](samples/README.md)）。
+
 ### 予定を取り出す・明日の予定を知らせる
 
 ```bash
