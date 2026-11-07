@@ -1,0 +1,14 @@
+# テスト用の上書き。偽の AI（mock）を足し、paperless-gpt とスクリプトの宛先をそこへ向ける
+services:
+  mock:
+    image: docker.io/library/python:3.12-slim
+    command: ["python", "-u", "/tests/mock_llm.py"]
+    volumes:
+      - ./tests:/tests:ro
+
+  paperless-gpt:
+    depends_on: [webserver, mock]
+
+  tools:
+    environment:
+      GEMINI_API_BASE: http://mock:8000

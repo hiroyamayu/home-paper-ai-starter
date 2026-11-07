@@ -1,0 +1,84 @@
+# 家の紙を AI が読める形にする最小構成
+#
+#   broker        … Paperless-ngx の作業の順番待ち（Valkey）
+#   webserver     … Paperless-ngx 本体（書類の保管・文字の読み取り・全文検索）
+#   paperless-gpt … AI が書類にタイトル・種類・発信元・タグを付ける
+#   tools         … 予定の取り出し・お知らせのスクリプトを動かす（必要なときだけ）
+#
+# 版は固定しています。上げるときは、リリースノートを読んでから書き換えてください。
+
+services:
+  broker:
+    image: docker.io/valkey/valkey:8-alpine
+    restart: unless-stopped
+    volumes:
+      - ./paperless/redis:/data
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:3.4.1
+    restart: unless-stopped
+    depends_on: [broker]
+    ports:
+      - "8000:8000"   # 家の LAN から http://<サーバーの IP>:8000 で開く
+    volumes:
+      - ./paperless/data:/usr/src/paperless/data
+      - ./paperless/media:/usr/src/paperless/media
+      - ./paperless/consume:/usr/src/paperless/consume   # ここに PDF を置くと取り込まれる
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
+      PAPERLESS_TIME_ZONE: ${TZ:-Asia/Tokyo}
+      # 日本語の OCR。初回の起動時に言語のデータを入れるので、少し時間がかかる
+      PAPERLESS_OCR_LANGUAGES: jpn
+      PAPERLESS_OCR_LANGUAGE: jpn+eng
+      # consume の下のフォルダー名をタグにしない（タグが増えすぎるため。12 章）
+      PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "false"
+      PAPERLESS_CONSUMER_RECURSIVE: "true"
+      USERMAP_UID: ${PUID:-1000}
+      USERMAP_GID: ${PGID:-1000}
+
+  paperless-gpt:
+    image: icereed/paperless-gpt:v0.31.0
+    restart: unless-stopped
+    depends_on: [webserver]
+    ports:
+      - "127.0.0.1:8080:8080"   # 画面には認証が無いので、サーバー自身からだけ開けるようにする
+    volumes:
+      - ./prompts:/app/prompts
+      - ./paperless-gpt/db:/app/db
+    environment:
+      PAPERLESS_BASE_URL: http://webserver:8000
+      PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
+      LLM_PROVIDER: ${LLM_PROVIDER:-googleai}
+      LLM_MODEL: ${LLM_MODEL}
+      GOOGLEAI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_LANGUAGE: Japanese
+      AUTO_TAG: paperless-gpt-auto    # このタグが付いた書類を AI が処理する
+      AUTO_TAG_COMPLETE: ""
+      FAIL_TAG: 要確認
+      # paperless-gpt 自身の OCR は使わない（文字は Paperless が読む）
+      OCR_PROVIDER: llm
+      # 起動時の設定の確認を通すための値。実際には使わない
+      VISION_LLM_PROVIDER: ollama
+      VISION_LLM_MODEL: unused
+      OLLAMA_HOST: http://localhost:11434
+      AUTO_OCR_TAG: paperless-gpt-ocr-unused
+      PDF_UPLOAD: "false"
+      TZ: ${TZ:-Asia/Tokyo}
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+
+  tools:
+    image: docker.io/library/python:3.12-slim
+    profiles: ["tools"]   # docker compose run --rm tools … のときだけ動く
+    working_dir: /work
+    volumes:
+      - ./scripts:/work/scripts:ro
+      - ./data:/work/data
+    env_file: .env
+    environment:
+      PAPERLESS_URL: http://webserver:8000

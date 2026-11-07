@@ -1,0 +1,20 @@
+# 秘密情報（絶対に Git に入れない）
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*credentials*.json
+*.bak*
+
+# Paperless・paperless-gpt のデータ
+paperless/
+paperless-gpt/
+
+# スクリプトが作るデータ
+data/*
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
