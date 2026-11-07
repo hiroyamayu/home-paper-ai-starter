@@ -46,10 +46,11 @@ AUTO=$(tag_id paperless-gpt-auto); PRIV=$(tag_id private)
 
 step "作り物のプリントを取り込む"
 python3 tests/make_sample_pdf.py /tmp/notice.pdf
-TASK=$(curl -s -H "$H" -F document=@/tmp/notice.pdf $API/documents/post_document/ | tr -d '"')
+curl -s -H "$H" -F document=@/tmp/notice.pdf $API/documents/post_document/ > /dev/null
 DOC=""
 for i in $(seq 1 60); do
-  DOC=$(curl -s -H "$H" "$API/tasks/?task_id=$TASK" | python3 -c 'import json,sys; t=json.load(sys.stdin); t=t.get("results", []) if isinstance(t, dict) else t; t=t[0] if t else {}; print(t.get("related_document") or "")')
+  # 新しい環境なので、取り込まれた最初の書類がこれ
+  DOC=$(curl -s -H "$H" "$API/documents/?ordering=id&page_size=1" | python3 -c 'import json,sys; r=json.load(sys.stdin)["results"]; print(r[0]["id"] if r else "")')
   [ -n "$DOC" ] && break
   sleep 5
 done

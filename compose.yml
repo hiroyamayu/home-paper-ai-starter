@@ -48,6 +48,7 @@ services:
     volumes:
       - ./prompts:/app/prompts
       - ./paperless-gpt/db:/app/db
+      - ./paperless-gpt/config:/app/config
     environment:
       PAPERLESS_BASE_URL: http://webserver:8000
       PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
