@@ -150,6 +150,6 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH -H "Authorization: Token 
 echo "OK：閲覧はできて、書き換えはできない"
 
 step "MCP の道具（private を返さないか）"
-$DC run --rm -T tools python tests/mcp_check.py || fail "MCP の道具"
+$DC run --rm -T tools python - < tests/mcp_check.py || fail "MCP の道具"
 
 step "すべて OK"
