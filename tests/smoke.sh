@@ -13,7 +13,8 @@ fail() { echo "NG: $*"; $DC logs --tail=80 webserver paperless-gpt mock || true;
 step "準備"
 cp tests/ci.env .env
 { echo "PUID=$(id -u)"; echo "PGID=$(id -g)"; } >> .env
-mkdir -p paperless/consume/private data
+mkdir -p paperless/consume/private data config
+$DC build tools
 
 step "Paperless を起動（初回は日本語の OCR データを入れるので数分かかる）"
 $DC up -d broker webserver mock
@@ -46,7 +47,7 @@ AUTO=$(tag_id paperless-gpt-auto); PRIV=$(tag_id private)
 
 step "作り物のプリントを取り込む"
 python3 tests/make_sample_pdf.py /tmp/notice.pdf
-curl -s -H "$H" -F document=@/tmp/notice.pdf $API/documents/post_document/ > /dev/null
+cp /tmp/notice.pdf paperless/consume/notice.pdf   # consume から入れる（持ち主なし。閲覧用ユーザーからも見える）
 DOC=""
 for i in $(seq 1 60); do
   # 新しい環境なので、取り込まれた最初の書類がこれ
@@ -113,5 +114,45 @@ assert $AUTO not in d['tags'], 'private の書類に paperless-gpt-auto が付�
 assert d['title']!='校外学習のお知らせ', 'private の書類を AI が名付けた'
 print('OK：private の書類は AI に渡っていない（タイトル：' + d['title'] + '）')
 "
+
+step "カレンダーに書き込む（偽の Google カレンダー）"
+cat > config/calendars.json <<'JSON'
+{"長女": "cal-chojo", "長男": "cal-chonan", "次男": "cal-jinan", "家族": "cal-family"}
+JSON
+cal() { $DC run --rm -T tools python -c "import json,urllib.request; print(json.dumps(json.load(urllib.request.urlopen('http://mock:8000/_calendar'))))"; }
+$DC run --rm -T tools python scripts/sync_calendar.py --today 2026-11-10 --dry-run | grep -q "（試し）書き込む" || fail "試しの書き込みが出ない"
+[ "$(cal)" = "{}" ] || fail "試しなのにカレンダーに書き込んだ"
+$DC run --rm -T tools python scripts/sync_calendar.py --today 2026-11-10
+cal | python3 -c "
+import json,sys
+c=json.load(sys.stdin); evs=[e for cal in c.values() for e in cal.values()]
+assert any(e['summary']=='校外学習' and e['start']=={'date':'2026-11-11'} and e['end']=={'date':'2026-11-12'} for e in evs), c
+assert all(e['id'].startswith('home') for e in evs)
+print('OK：', {k: [e['summary'] for e in v.values()] for k,v in c.items()})
+"
+$DC run --rm -T tools python scripts/sync_calendar.py --today 2026-11-10 > /dev/null
+[ "$(cal | python3 -c 'import json,sys; print(sum(len(v) for v in json.load(sys.stdin).values()))')" = "1" ] || fail "2 回目で予定が増えた"
+
+step "人が消した予定は、二度と書き込まない"
+EID=$(cal | python3 -c 'import json,sys; c=json.load(sys.stdin); print([(k,i) for k,v in c.items() for i in v][0][0] + "/events/" + [(k,i) for k,v in c.items() for i in v][0][1])')
+$DC run --rm -T tools python -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://mock:8000/calendar/v3/calendars/$EID', method='DELETE'))"
+$DC run --rm -T tools python scripts/sync_calendar.py --today 2026-11-10 | grep -q "人が消した予定" || fail "人が消したことに気づかない"
+cal | python3 -c "import json,sys; c=json.load(sys.stdin); assert all(e['status']=='cancelled' for v in c.values() for e in v.values()), '消した予定が戻った'"
+$DC run --rm -T tools python scripts/notify_tomorrow.py --today 2026-11-10 | grep -q "送りません" || fail "人が消した予定を知らせた"
+
+step "閲覧だけのユーザー（MCP 用）"
+READER=$($DC run --rm -T tools python scripts/create_reader.py 2>/dev/null | tail -1)
+[ -n "$READER" ] || fail "閲覧用のトークンが作れない"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Token $READER" $API/documents/)
+[ "$code" = "200" ] || fail "閲覧用のトークンで書類の一覧が見られない（$code）"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH -H "Authorization: Token $READER" -H 'Content-Type: application/json' -d '{"title":"x"}' $API/documents/$DOC/)
+[ "$code" = "403" ] || [ "$code" = "404" ] || fail "閲覧用のトークンで書類を書き換えられた（$code）"
+echo "OK：閲覧はできて、書き換えはできない"
+
+step "MCP の道具（private を返さないか）"
+sed -i "s/^PAPERLESS_READER_TOKEN=.*/PAPERLESS_READER_TOKEN=$READER/" .env
+grep -q "^PAPERLESS_READER_TOKEN=$READER" .env || echo "PAPERLESS_READER_TOKEN=$READER" >> .env
+# 本番と同じく、閲覧用のトークンだけで動かす（管理者のトークンは空にする）
+$DC run --rm -T -e PAPERLESS_API_TOKEN= tools python - < tests/mcp_check.py || fail "MCP の道具"
 
 step "すべて OK"

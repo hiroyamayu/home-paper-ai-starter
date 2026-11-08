@@ -68,12 +68,17 @@ def extract(doc):
     return sorted(clean, key=lambda e: e["date"])
 
 
+def tag_names():
+    return {t["id"]: t["name"] for t in paperless_all("tags/")}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--doc", type=int, help="この書類だけ読み直す")
     args = ap.parse_args()
 
     store = load()
+    names = tag_names()
     docs = [paperless("GET", f"documents/{args.doc}/")] if args.doc else candidates()
     for d in docs:
         key = str(d["id"])
@@ -84,7 +89,9 @@ def main():
         except RuntimeError as e:
             print(f"#{d['id']} {d['title']}：読めませんでした（{e}）")
             continue
-        store["docs"][key] = {"title": d["title"], "modified": d["modified"], "events": events}
+        # 書類に付いたタグ（長女・長男など）も残す。3 章でカレンダーを選ぶときに使う
+        tags = [names[t] for t in d.get("tags", []) if t in names]
+        store["docs"][key] = {"title": d["title"], "modified": d["modified"], "tags": tags, "events": events}
         save(store)
         print(f"#{d['id']} {d['title']}：{len(events)} 件")
     if not docs:

@@ -10,14 +10,13 @@ import argparse
 import datetime as dt
 import json
 import os
-import re
 import sys
 import time
 import urllib.parse
 import urllib.request
 from zoneinfo import ZoneInfo
 
-from common import PAPERLESS_URL, data_path
+from common import PAPERLESS_URL, data_path, event_key, load_json, merge
 
 WEEKDAYS = "月火水木金土日"
 
@@ -29,32 +28,18 @@ def events_on(day):
     with open(path, encoding="utf-8") as f:
         store = json.load(f)
     out = []
+    # 3 章のカレンダーを使っていれば、人が消した予定と、決まりで外した予定は知らせない
+    state = load_json("calendar_state.json", {})
+    skip = set(state.get("deleted", []))
+    skip |= {k for k, j in state.get("judgements", {}).items() if not j.get("include", True)}
     for doc_id, d in store["docs"].items():
         for e in d["events"]:
+            if event_key(e) in skip:
+                continue
             start = e["date"]
             end = e.get("end_date") or start
             if start <= day.isoformat() <= end:
                 out.append({**e, "doc_id": doc_id, "doc_title": d["title"]})
-    return out
-
-
-def _core(title):
-    """かっこの中と空白を除いた行事名（「校外学習（市民の森公園）」→「校外学習」）"""
-    return re.sub(r"[（(].*?[）)]|\s", "", title)
-
-
-def merge(events):
-    """同じ日に同じ行事が複数のプリントから出たら 1 つにまとめる。持ち物が一番詳しいものを残す"""
-    out = []
-    for e in sorted(events, key=lambda e: -len(e.get("items") or "")):
-        core = _core(e["title"])
-        same = next((o for o in out if core and (core in _core(o["title"]) or _core(o["title"]) in core)), None)
-        if same:
-            same["doc_titles"].add(e["doc_title"])
-            if not same.get("target") and e.get("target"):
-                same["target"] = e["target"]
-        else:
-            out.append({**e, "doc_titles": {e["doc_title"]}})
     return out
 
 

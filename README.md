@@ -9,7 +9,7 @@
 3. 「行事予定」と「お便り」の書類から、予定と持ち物を取り出してためる
 4. 明日の予定があれば、前の晩に **Pushover** でスマホに知らせる
 
-カレンダーへの書き込み、子どもごとの振り分け、Claude や Gemini からの検索（MCP）は、本の 3〜6 章で足していきます。
+あわせて、本の 3 章の「Google カレンダーへの書き込み」と、6 章の「Claude から家の書類を引く（MCP）」も入っています（下の節）。
 
 ## 用意するもの
 
@@ -72,7 +72,93 @@ docker compose run --rm tools python scripts/notify_tomorrow.py
 0 20 * * * cd /path/to/home-paper-ai-starter && docker compose run --rm tools python scripts/notify_tomorrow.py >> data/cron.log 2>&1
 ```
 
-### Gemini の無料枠で試すとき
+## 予定を Google カレンダーに入れる（本の 3 章）
+
+取り出した予定のうち、家に関係するものだけを、人ごとの Google カレンダーに毎晩書き込みます。
+
+1. Google Cloud でプロジェクトを作り、「Google Calendar API」を有効にする
+2. サービスアカウントを作り、鍵（JSON）をダウンロードして `config/service-account.json` に置く（Git には入りません）
+3. Google カレンダーで、人ごとのカレンダー（長女・長男・次男・家族など）を作る。それぞれの「設定と共有」→「特定のユーザーとの共有」に、サービスアカウントのメールアドレスを「予定の変更」で追加する
+4. `config/calendars.example.json` を `config/calendars.json` に写し、カレンダー ID を書く（「設定と共有」→「カレンダーの統合」にあります）
+5. `config/calendar_rules.md` の「入れる・外す」の決まりを、自分の家に合わせて書き換える
+
+```bash
+# 書き込まずに、何をするかだけ見る
+docker compose run --rm tools python scripts/sync_calendar.py --dry-run
+
+# 書き込む
+docker compose run --rm tools python scripts/sync_calendar.py
+```
+
+- 予定の ID はスクリプトが決めます（`home` で始まる）。何度動かしても予定は増えず、**人が手で入れた予定には触りません**
+- 自動で入れた予定を人が消すと、次に動かしたときに気づいて、**二度と書き込みません**。明日のお知らせにも出しません
+- 決まりで「外す」とした予定も、お知らせに出しません
+- 初めて動かすとき、スクリプト用のコンテナ（`tools`）が作られるので少し時間がかかります
+
+毎晩動かすなら、cron の予定の取り出しとお知らせの間に足します。
+
+```cron
+50 19 * * * cd /path/to/home-paper-ai-starter && docker compose run --rm tools python scripts/sync_calendar.py >> data/cron.log 2>&1
+```
+
+## AI から家の書類を引く（本の 6 章）
+
+Claude Desktop から、家の書類と予定を引けるようにします（MCP）。道具は読み取り専用で、`private` の書類は道具の側で必ず除きます。
+
+| 道具 | すること |
+|---|---|
+| `search_documents` | 書類を本文の言葉で探す |
+| `get_document_text` | 書類 1 件の本文を読む |
+| `search_events` | 取り出した行事予定を、日付や言葉で探す |
+
+まず、書類を見ることだけができるユーザーを作り、出たトークンを `.env` の `PAPERLESS_READER_TOKEN` に書きます。管理者のトークンを使い回さないためです。
+
+```bash
+docker compose run --rm tools python scripts/create_reader.py
+```
+
+Paperless は、画面や API でアップロードした書類の持ち主を、アップロードした人にします。持ち主のいる書類は、閲覧用のユーザーからは見えません。`consume/` フォルダーに置いた書類は持ち主がいないので見えます。
+
+### つなぎ方 1：PC から SSH でサーバーのコンテナを動かす
+
+PC からサーバーに鍵で SSH できるなら、PC に Python を入れる必要はありません。Claude Desktop の設定ファイル（`claude_desktop_config.json`）に足します。
+
+```json
+{
+  "mcpServers": {
+    "home-docs": {
+      "command": "ssh",
+      "args": ["<サーバーの SSH の名前>", "cd ~/home-paper-ai-starter && docker compose run --rm -T tools python scripts/mcp_server.py"]
+    }
+  }
+}
+```
+
+### つなぎ方 2：PC の Python で動かす
+
+```bash
+pip install -r tools/requirements.txt
+```
+
+```json
+{
+  "mcpServers": {
+    "home-docs": {
+      "command": "python",
+      "args": ["C:\\path\\to\\home-paper-ai-starter\\scripts\\mcp_server.py"],
+      "env": {
+        "PAPERLESS_URL": "http://<サーバーの IP>:8000",
+        "PAPERLESS_READER_TOKEN": "<閲覧用のトークン>",
+        "DATA_DIR": "<data フォルダーの場所。予定を引くときに使う>"
+      }
+    }
+  }
+}
+```
+
+Claude Desktop を再起動すると、チャットから「来週の持ち物は？」のように聞けます。家の書類を引く会話では、書き込みのできるほかのコネクタを一緒に使わないでください（書類の本文に紛れた指示で悪用される余地があるため。本の 6 章）。
+
+## Gemini の無料枠で試すとき
 
 無料枠には「1 分間に 15 回まで」のような上限があります。paperless-gpt は 1 つの書類で 5 回（タイトル・タグ・発信元・種類・日付）Gemini を呼ぶので、何枚もまとめて入れるとすぐに上限に当たります。`.env` の `LLM_REQUESTS_PER_MINUTE=10` にしてください。
 
@@ -91,7 +177,10 @@ docker compose run --rm tools python scripts/notify_tomorrow.py
 | 文字の読み取り（OCR） | 家の中（Paperless 標準の OCR） | 家の中 |
 | 名付け・分類 | Gemini（読み取った文字だけ） | 送らない |
 | 予定の取り出し | Gemini（PDF ごと） | 送らない |
+| カレンダーに入れるかの判定 | Gemini（予定の名前・日付・どの子の書類か、カレンダーの決まり） | 送らない |
+| カレンダー | Google カレンダー（予定の名前・持ち物・原本のタイトル） | 入れない |
 | お知らせ | Pushover（予定の名前と持ち物） | — |
+| AI から書類を引く | Claude など（探した書類のタイトルと本文） | 返さない |
 
 ## テスト
 

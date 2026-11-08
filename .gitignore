@@ -5,6 +5,8 @@
 *.key
 *.pem
 *credentials*.json
+config/service-account.json
+config/calendars.json
 *.bak*
 
 # Paperless・paperless-gpt のデータ

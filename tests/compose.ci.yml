@@ -12,3 +12,5 @@ services:
   tools:
     environment:
       GEMINI_API_BASE: http://mock:8000
+      GOOGLE_API_BASE: http://mock:8000
+      GOOGLE_FAKE_TOKEN: ci-dummy
