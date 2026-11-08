@@ -10,6 +10,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -37,6 +38,26 @@ def events_on(day):
     return out
 
 
+def _core(title):
+    """かっこの中と空白を除いた行事名（「校外学習（市民の森公園）」→「校外学習」）"""
+    return re.sub(r"[（(].*?[）)]|\s", "", title)
+
+
+def merge(events):
+    """同じ日に同じ行事が複数のプリントから出たら 1 つにまとめる。持ち物が一番詳しいものを残す"""
+    out = []
+    for e in sorted(events, key=lambda e: -len(e.get("items") or "")):
+        core = _core(e["title"])
+        same = next((o for o in out if core and (core in _core(o["title"]) or _core(o["title"]) in core)), None)
+        if same:
+            same["doc_titles"].add(e["doc_title"])
+            if not same.get("target") and e.get("target"):
+                same["target"] = e["target"]
+        else:
+            out.append({**e, "doc_titles": {e["doc_title"]}})
+    return out
+
+
 def compose(day, events):
     lines = [f"明日 {day.month}/{day.day}（{WEEKDAYS[day.weekday()]}）の予定", ""]
     for e in events:
@@ -45,7 +66,7 @@ def compose(day, events):
         if e.get("items"):
             lines.append(f"  {e['items']}")
     lines.append("")
-    lines.append("原本：" + " / ".join(sorted({e["doc_title"] for e in events})))
+    lines.append("原本：" + " / ".join(sorted(set().union(*(e["doc_titles"] for e in events)))))
     return "\n".join(lines)
 
 
@@ -78,7 +99,7 @@ def main():
     today = dt.date.fromisoformat(args.today) if args.today else dt.datetime.now(tz).date()
     tomorrow = today + dt.timedelta(days=1)
 
-    events = events_on(tomorrow)
+    events = merge(events_on(tomorrow))
     if not events:
         print(f"{tomorrow} の予定はありません。送りません")
         return

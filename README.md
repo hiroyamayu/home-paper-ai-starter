@@ -6,7 +6,7 @@
 
 1. スキャンした書類やスマホで撮った書類を **Paperless-ngx** に取り込み、全文検索できるようにする
 2. **paperless-gpt** と Gemini で、書類にタイトル・種類・発信元・タグを付ける
-3. 「行事予定」の書類から、予定を取り出してためる
+3. 「行事予定」と「お便り」の書類から、予定と持ち物を取り出してためる
 4. 明日の予定があれば、前の晩に **Pushover** でスマホに知らせる
 
 カレンダーへの書き込み、子どもごとの振り分け、Claude や Gemini からの検索（MCP）は、本の 3〜6 章で足していきます。
@@ -57,10 +57,11 @@ docker compose up -d paperless-gpt
 ### 予定を取り出す・明日の予定を知らせる
 
 ```bash
-# 「行事予定」の書類から予定を取り出す（data/events.json にたまる）
+# 「行事予定」「お便り」の書類から予定を取り出す（data/events.json にたまる）
 docker compose run --rm tools python scripts/extract_events.py
 
 # 明日の予定があれば知らせる（PUSHOVER_TOKEN が空なら、画面に出すだけ）
+# 同じ行事が複数のプリントに書いてあれば 1 つにまとめる
 docker compose run --rm tools python scripts/notify_tomorrow.py
 ```
 
@@ -70,6 +71,12 @@ docker compose run --rm tools python scripts/notify_tomorrow.py
 40 19 * * * cd /path/to/home-paper-ai-starter && docker compose run --rm tools python scripts/extract_events.py >> data/cron.log 2>&1
 0 20 * * * cd /path/to/home-paper-ai-starter && docker compose run --rm tools python scripts/notify_tomorrow.py >> data/cron.log 2>&1
 ```
+
+### Gemini の無料枠で試すとき
+
+無料枠には「1 分間に 15 回まで」のような上限があります。paperless-gpt は 1 つの書類で 5 回（タイトル・タグ・発信元・種類・日付）Gemini を呼ぶので、何枚もまとめて入れるとすぐに上限に当たります。`.env` の `LLM_REQUESTS_PER_MINUTE=10` にしてください。
+
+**無料枠は、送った内容がサービスの改善に使われます。**試すのは `samples/` の作り物のプリントだけにして、家の書類を入れるのは課金を有効にしてからにしてください。
 
 ## 自分の家に合わせる
 
