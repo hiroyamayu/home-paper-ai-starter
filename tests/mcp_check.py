@@ -5,6 +5,8 @@ import sys
 sys.path.insert(0, "scripts")
 import mcp_server as m  # noqa: E402
 
+import os  # noqa: E402
+assert os.environ.get("PAPERLESS_READER_TOKEN") and not os.environ.get("PAPERLESS_API_TOKEN"), "閲覧用のトークンだけで動かす"
 names = {t.name for t in asyncio.run(m.mcp.list_tools())}
 assert names == {"search_documents", "get_document_text", "search_events"}, names
 print("道具：", sorted(names))
@@ -16,6 +18,10 @@ assert all("Private copy" not in m.get_document_text(d["id"]) for d in found), "
 
 hidden = m.search_documents("Private copy")
 assert not hidden, f"private の書類が検索に出た：{hidden}"
+import json, urllib.request  # noqa: E401,E402
+pid = m._get("documents/", {"query": "Private copy"})["results"]
+assert pid, "（確かめの前提）閲覧用ユーザーから private の書類そのものは見える"
+assert "読めません" in m.get_document_text(pid[0]["id"]), "private の書類の本文が読めた"
 
 ev = m.search_events(start="2026-11-11", end="2026-11-11")
 print("search_events:", ev)

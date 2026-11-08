@@ -47,7 +47,7 @@ AUTO=$(tag_id paperless-gpt-auto); PRIV=$(tag_id private)
 
 step "作り物のプリントを取り込む"
 python3 tests/make_sample_pdf.py /tmp/notice.pdf
-curl -s -H "$H" -F document=@/tmp/notice.pdf $API/documents/post_document/ > /dev/null
+cp /tmp/notice.pdf paperless/consume/notice.pdf   # consume から入れる（持ち主なし。閲覧用ユーザーからも見える）
 DOC=""
 for i in $(seq 1 60); do
   # 新しい環境なので、取り込まれた最初の書類がこれ
@@ -150,6 +150,9 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X PATCH -H "Authorization: Token 
 echo "OK：閲覧はできて、書き換えはできない"
 
 step "MCP の道具（private を返さないか）"
-$DC run --rm -T tools python - < tests/mcp_check.py || fail "MCP の道具"
+sed -i "s/^PAPERLESS_READER_TOKEN=.*/PAPERLESS_READER_TOKEN=$READER/" .env
+grep -q "^PAPERLESS_READER_TOKEN=$READER" .env || echo "PAPERLESS_READER_TOKEN=$READER" >> .env
+# 本番と同じく、閲覧用のトークンだけで動かす（管理者のトークンは空にする）
+$DC run --rm -T -e PAPERLESS_API_TOKEN= tools python - < tests/mcp_check.py || fail "MCP の道具"
 
 step "すべて OK"

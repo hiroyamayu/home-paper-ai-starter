@@ -6,6 +6,9 @@
 管理者のトークンを MCP に使い回すと、道具にバグがあったときに書類を書き換えられてしまう。
 閲覧だけのユーザーなら、道具が何をしても書類は変わらない。
 
+タグ・書類の種類・発信元の持ち主も外す（reader から private タグが見えないと、MCP が private を除けないため）。
+発信元やタグが増えたら、もう一度動かす（何度動かしてもよい。トークンは作り直される）。
+
 注意：Paperless は、画面や API でアップロードした書類の持ち主を、アップロードした人にする。
 持ち主のいる書類は、ほかのユーザー（reader）からは見えない。consume フォルダーに置いた書類は持ち主がいないので見える。
 """
@@ -31,6 +34,12 @@ def main():
         paperless("PATCH", f"users/{users[0]['id']}/", body=body)
     else:
         paperless("POST", "users/", body=body)
+    # タグ・書類の種類・発信元は、作った人（管理者）が持ち主になっていて、reader からは見えない。
+    # 見えないと MCP が private を除けないので、持ち主を外して誰でも見えるようにする（名前だけで、書類の中身ではない）
+    for path in ("tags/", "document_types/", "correspondents/"):
+        for x in paperless_all(path):
+            if x.get("owner") is not None:
+                paperless("PATCH", f"{path}{x['id']}/", body={"owner": None})
     data = urllib.parse.urlencode({"username": USERNAME, "password": password}).encode()
     with urllib.request.urlopen(urllib.request.Request(PAPERLESS_URL + "/api/token/", data=data), timeout=30) as r:
         print(json.loads(r.read())["token"])

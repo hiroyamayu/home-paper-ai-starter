@@ -39,10 +39,17 @@ _hidden_ids = None
 
 
 def hidden_tag_ids():
+    """除くタグの ID。見つからなければ止める（何も除かずに返すことは絶対にしない）"""
     global _hidden_ids
     if _hidden_ids is None:
         tags = _get("tags/", {"page_size": 1000})["results"]
-        _hidden_ids = {t["id"] for t in tags if t["name"] in HIDDEN_TAGS}
+        found = {t["name"]: t["id"] for t in tags if t["name"] in HIDDEN_TAGS}
+        missing = [n for n in HIDDEN_TAGS if n not in found]
+        if missing:
+            # 閲覧用のユーザーからタグが見えないと、除外が効かなくなる。そのときは道具ごと止める
+            raise RuntimeError(f"タグ「{'・'.join(missing)}」が見えないので、安全のため止めました。"
+                               "scripts/create_reader.py をもう一度動かしてください")
+        _hidden_ids = set(found.values())
     return _hidden_ids
 
 
@@ -55,15 +62,15 @@ def search_documents(query: str, limit: int = 10) -> list[dict]:
     """家の書類を、本文の言葉で全文検索する。
     学校・幼稚園のお便り、行事、持ち物、提出物、給食、家電の使い方や保証、契約について聞かれたら、まずこれで探す。
     返すのは id・タイトル・日付・発信元・種類・原本の URL。本文が要るときは get_document_text に id を渡す。"""
-    params = {"query": query, "page_size": max(1, min(limit, 25))}
     hidden = hidden_tag_ids()
-    if hidden:
-        params["tags__id__none"] = ",".join(map(str, hidden))   # private は返さない
+    params = {"query": query, "page_size": max(1, min(limit, 25)),
+              "tags__id__none": ",".join(map(str, hidden))}   # private は返さない
     corr, types = _names("correspondents/"), _names("document_types/")
+    docs = [d for d in _get("documents/", params)["results"] if not set(d.get("tags", [])) & hidden]
     return [{"id": d["id"], "title": d["title"], "created": (d.get("created") or "")[:10],
              "correspondent": corr.get(d.get("correspondent")), "document_type": types.get(d.get("document_type")),
              "url": f"{PUBLIC_URL}/documents/{d['id']}/details"}
-            for d in _get("documents/", params)["results"]]
+            for d in docs]
 
 
 @mcp.tool()
