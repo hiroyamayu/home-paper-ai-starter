@@ -88,6 +88,7 @@ fi
 step "予定を取り出す"
 $DC run --rm -T tools python scripts/extract_events.py
 grep -q '"2026-11-11"' data/events.json || fail "予定が取り出せない"
+grep -q 'ずれた予定' data/events.json && fail "曜日の合わない予定が入った"
 $DC run --rm -T tools python scripts/extract_events.py | grep -q "校外学習" && fail "変わっていない書類を読み直している" || true
 
 step "明日のお知らせ（11/10 に送る想定）"
