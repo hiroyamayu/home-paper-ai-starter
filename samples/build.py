@@ -166,6 +166,40 @@ DOCS["07_食器洗い乾燥機_保証書"] = page("保証書", """
 """)
 
 
+# 8. 算数のテスト（答案。赤ペンの丸付き。10 問中 2 問まちがい）
+PROBLEMS = [("63", "28", "35", True), ("81", "45", "36", True), ("52", "27", "35", False),
+            ("94", "56", "38", True), ("40", "13", "27", True), ("70", "34", "44", False),
+            ("65", "19", "46", True), ("83", "48", "35", True), ("56", "29", "27", True),
+            ("91", "64", "27", True)]
+cells = []
+for i, (a, b, ans, ok) in enumerate(PROBLEMS, 1):
+    mark = ("<div class='ok'></div>" if ok else "<div class='ng'>✓</div>")
+    cells.append(f"""<td><div class='no'>({i})</div><div class='hissan'>
+<div>&nbsp;{a}</div><div>−{b}</div><div class='bar'></div><div class='ans'>&nbsp;{ans}</div>{mark}</div></td>""")
+rows = "".join("<tr>" + "".join(cells[r * 5:(r + 1) * 5]) + "</tr>" for r in range(2))
+DOCS["08_算数テスト_ひき算のひっ算"] = page("算数テスト", f"""<style>
+.hissan {{ position: relative; font-family: 'Noto Sans Mono CJK JP', monospace; font-size: 20pt; line-height: 1.25;
+          width: 26mm; margin: 2mm auto 4mm; text-align: right; }}
+.bar {{ border-top: 2px solid #222; margin: 1mm 0; }}
+.ans {{ font-family: 'Noto Serif CJK JP', serif; color: #3a3a3a; transform: rotate(-3deg); }}
+.ok {{ position: absolute; right: -2mm; bottom: -2mm; width: 16mm; height: 11mm; border: 2.5px solid #d22;
+       border-radius: 50%; transform: rotate(-8deg); }}
+.ng {{ position: absolute; right: -6mm; bottom: 0; color: #d22; font-size: 26pt; transform: rotate(10deg); }}
+.no {{ font-size: 11pt; }}
+td {{ border: 1px solid #999; width: 20%; }}
+.score {{ position: absolute; right: 0mm; top: 15mm; color: #d22; font-size: 30pt; font-family: 'Noto Serif CJK JP', serif;
+          border: 3px solid #d22; border-radius: 50%; width: 32mm; height: 24mm; text-align: center; line-height: 24mm;
+          transform: rotate(-6deg); }}
+</style>
+<div class='score'>80</div>
+<div class='meta'><span>みどり小学校　2年1組</span><span>なまえ（　すずき　さくら　）</span></div>
+<h1>ひき算の ひっ算</h1>
+<p>つぎの けいさんを ひっ算で しましょう。（1もん 10てん）</p>
+<table>{rows}</table>
+<p class='small'>くり下がりに 気を つけよう。</p>
+""")
+
+
 def chrome():
     for c in ("google-chrome", "chromium", "chromium-browser"):
         if shutil.which(c):
@@ -189,7 +223,7 @@ def main():
 
 
 def scan(pdf, png):
-    """スキャンしたような画像（1 ページ目・少し傾けて灰色に）。OCR を試すとき用"""
+    """スキャンしたような画像（1 ページ目・少し傾けて色を薄く）。OCR を試すとき用。赤ペンが読めるよう色は残す"""
     try:
         from PIL import Image, ImageFilter
     except ImportError:
@@ -198,8 +232,8 @@ def scan(pdf, png):
     os.makedirs(os.path.dirname(png), exist_ok=True)
     base = png[:-4]
     subprocess.run(["pdftoppm", "-r", "150", "-png", "-f", "1", "-l", "1", "-singlefile", pdf, base], check=True)
-    im = Image.open(png).convert("L")
-    im = im.rotate(0.8, resample=Image.BICUBIC, expand=True, fillcolor=245)
+    im = Image.open(png).convert("RGB")
+    im = im.rotate(0.8, resample=Image.BICUBIC, expand=True, fillcolor=(245, 245, 242))
     im = im.point(lambda v: min(255, int(v * 0.92 + 18))).filter(ImageFilter.GaussianBlur(0.4))
     im.save(png, optimize=True)
     print(png)
