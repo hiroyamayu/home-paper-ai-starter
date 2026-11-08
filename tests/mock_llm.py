@@ -10,8 +10,11 @@ import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-EVENTS = [{"date": "2026-11-11", "end_date": None, "title": "校外学習", "target": "2年",
-           "items": "お弁当・水筒・レジャーシート"}]
+EVENTS = [{"date": "2026-11-11", "weekday": "水", "end_date": None, "title": "校外学習", "target": "2年",
+           "items": "お弁当・水筒・レジャーシート"},
+          # 曜日が合わない（1 日ずれた読み違い）。extract_events.py が捨てるはず
+          {"date": "2026-11-17", "weekday": "月", "end_date": None, "title": "ずれた予定", "target": None,
+           "items": None}]
 
 
 def answer_for(prompt):
