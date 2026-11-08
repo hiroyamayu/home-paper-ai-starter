@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     depends_on: [broker]
     ports:
-      - "8000:8000"   # 家の LAN から http://<サーバーの IP>:8000 で開く
+      - "${PAPERLESS_PORT:-8000}:8000"   # 家の LAN から http://<サーバーの IP>:8000 で開く
     volumes:
       - ./paperless/data:/usr/src/paperless/data
       - ./paperless/media:/usr/src/paperless/media
@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
     depends_on: [webserver]
     ports:
-      - "127.0.0.1:8080:8080"   # 画面には認証が無いので、サーバー自身からだけ開けるようにする
+      - "127.0.0.1:${PAPERLESS_GPT_PORT:-8080}:8080"   # 画面には認証が無いので、サーバー自身からだけ開けるようにする
     volumes:
       - ./prompts:/app/prompts
       - ./paperless-gpt/db:/app/db
@@ -58,7 +58,10 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       LLM_LANGUAGE: Japanese
+      # 1 分あたりに AI を呼ぶ回数の上限。1 書類で 5 回呼ぶ。Gemini の無料枠（1 分 15 回）なら 10 にする
+      LLM_REQUESTS_PER_MINUTE: ${LLM_REQUESTS_PER_MINUTE:-120}
       AUTO_TAG: paperless-gpt-auto    # このタグが付いた書類を AI が処理する
+      CORRESPONDENT_BLACK_LIST: "不明,なし,該当なし"   # AI が「不明」と返したとき、それを発信元として登録しない
       AUTO_TAG_COMPLETE: ""
       FAIL_TAG: 要確認
       # paperless-gpt 自身の OCR は使わない（文字は Paperless が読む）

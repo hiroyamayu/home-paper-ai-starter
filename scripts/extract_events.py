@@ -1,4 +1,4 @@
-"""「行事予定」の書類から予定を取り出して、data/events.json にためる（3 章の最小版）。
+"""「行事予定」と「お便り」の書類から予定を取り出して、data/events.json にためる（3 章の最小版）。
 
   docker compose run --rm tools python scripts/extract_events.py          # まだ読んでいない書類を読む
   docker compose run --rm tools python scripts/extract_events.py --doc 12 # 1 件だけ読み直す
@@ -12,10 +12,11 @@ import os
 
 from common import data_path, gemini_json, paperless, paperless_all
 
-DOC_TYPE = "行事予定"
+# 予定を取り出す書類の種類。お便り（学年だより・お知らせ）にも、行事と持ち物が書いてあることが多い
+DOC_TYPES = ["行事予定", "お便り"]
 EVENTS_FILE = data_path("events.json")
 
-PROMPT = """あなたは家庭の予定の整理係です。添付の PDF は、学校・幼稚園などから届いた行事予定です。
+PROMPT = """あなたは家庭の予定の整理係です。添付の PDF は、学校・幼稚園などから届いた行事予定やお便りです。
 書類の題名：{title}
 書類の日付：{created}
 
@@ -48,10 +49,11 @@ def save(store):
 def candidates():
     types = {t["name"]: t["id"] for t in paperless_all("document_types/")}
     tags = {t["name"]: t["id"] for t in paperless_all("tags/")}
-    if DOC_TYPE not in types:
-        raise SystemExit(f"書類の種類「{DOC_TYPE}」がありません。先に setup_paperless.py を動かしてください")
+    missing = [n for n in DOC_TYPES if n not in types]
+    if missing:
+        raise SystemExit(f"書類の種類「{'・'.join(missing)}」がありません。先に setup_paperless.py を動かしてください")
     skip = [str(tags[n]) for n in ("private", "paperless-gpt-auto") if n in tags]
-    params = {"document_type__id": types[DOC_TYPE], "ordering": "id"}
+    params = {"document_type__id__in": ",".join(str(types[n]) for n in DOC_TYPES), "ordering": "id"}
     if skip:
         params["tags__id__none"] = ",".join(skip)
     return paperless_all("documents/", params)
@@ -86,7 +88,7 @@ def main():
         save(store)
         print(f"#{d['id']} {d['title']}：{len(events)} 件")
     if not docs:
-        print(f"「{DOC_TYPE}」の書類はまだありません")
+        print(f"「{'・'.join(DOC_TYPES)}」の書類はまだありません")
 
 
 if __name__ == "__main__":
