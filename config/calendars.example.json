@@ -1,0 +1,7 @@
+{
+  "_説明": "このファイルを calendars.json に写して、カレンダー ID を書き換える。左の名前は人のタグ（長女・長男・次男）と「家族」。カレンダー ID は Google カレンダーの「設定と共有」→「カレンダーの統合」にある。",
+  "長女": "xxxxxxxxxxxxxxxxxxxx@group.calendar.google.com",
+  "長男": "xxxxxxxxxxxxxxxxxxxx@group.calendar.google.com",
+  "次男": "xxxxxxxxxxxxxxxxxxxx@group.calendar.google.com",
+  "家族": "xxxxxxxxxxxxxxxxxxxx@group.calendar.google.com"
+}

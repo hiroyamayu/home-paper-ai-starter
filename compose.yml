@@ -3,7 +3,7 @@
 #   broker        … Paperless-ngx の作業の順番待ち（Valkey）
 #   webserver     … Paperless-ngx 本体（書類の保管・文字の読み取り・全文検索）
 #   paperless-gpt … AI が書類にタイトル・種類・発信元・タグを付ける
-#   tools         … 予定の取り出し・お知らせのスクリプトを動かす（必要なときだけ）
+#   tools         … 予定の取り出し・お知らせ・カレンダー・MCP のスクリプトを動かす（必要なときだけ）
 #
 # 版は固定しています。上げるときは、リリースノートを読んでから書き換えてください。
 
@@ -77,11 +77,13 @@ services:
       PGID: ${PGID:-1000}
 
   tools:
-    image: docker.io/library/python:3.12-slim
+    build: ./tools        # python に、カレンダーと MCP で使うライブラリを足したもの
+    image: home-paper-ai-tools
     profiles: ["tools"]   # docker compose run --rm tools … のときだけ動く
     working_dir: /work
     volumes:
       - ./scripts:/work/scripts:ro
+      - ./config:/work/config:ro   # カレンダーの決まり・サービスアカウントの鍵
       - ./data:/work/data
     env_file: .env
     environment:

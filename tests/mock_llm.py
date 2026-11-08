@@ -1,8 +1,11 @@
-"""テスト用の偽の AI。決まった答えを返すだけ。
+"""テスト用の偽の AI と、偽の Google カレンダー。決まった答えを返すだけ。
 
-- POST /v1/chat/completions                 … paperless-gpt から（OpenAI 互換）
-- POST /v1beta/models/<model>:generateContent … scripts/extract_events.py から（Gemini）
+- POST /v1/chat/completions                   … paperless-gpt から（OpenAI 互換）
+- POST /v1beta/models/<model>:generateContent … 予定の取り出し・カレンダーの判定から（Gemini）
+- /calendar/v3/calendars/<cal>/events[/<id>]  … scripts/sync_calendar.py から（Google カレンダー）
+- GET /_calendar                               … テストが中身を確かめる
 """
+import re
 import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +28,16 @@ def answer_for(prompt):
     return "その他"
 
 
+CALENDAR = {}   # cal -> {event_id: body}
+
+
+def judge(prompt):
+    m = re.search(r"<events>\n(.*)\n</events>", prompt, re.S)
+    items = json.loads(m.group(1)) if m else []
+    return [{"key": e["key"], "include": True, "calendar": (e.get("tags") or ["家族"])[0], "reason": "テスト"}
+            for e in items]
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode()
@@ -34,11 +47,48 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _cal(self):
+        m = re.match(r".*/calendar/v3/calendars/([^/]+)/events(?:/([^/?]+))?", self.path)
+        return (m.group(1), m.group(2)) if m else (None, None)
+
     def do_GET(self):
+        if self.path.startswith("/_calendar"):
+            return self._send(200, CALENDAR)
+        cal, eid = self._cal()
+        if cal:
+            ev = CALENDAR.get(cal, {}).get(eid)
+            return self._send(200, ev) if ev else self._send(404, {"error": "not found"})
         self._send(200, {"ok": True})
+
+    def do_PUT(self):
+        cal, eid = self._cal()
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        CALENDAR.setdefault(cal, {})[eid] = {**body, "status": "confirmed"}
+        print("calendar: put", cal, body.get("summary"), flush=True)
+        self._send(200, body)
+
+    def do_DELETE(self):
+        cal, eid = self._cal()
+        ev = CALENDAR.get(cal, {}).get(eid)
+        if not ev:
+            return self._send(404, {"error": "not found"})
+        ev["status"] = "cancelled"
+        print("calendar: delete", cal, eid, flush=True)
+        self.send_response(204)
+        self.end_headers()
 
     def do_POST(self):
         req = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        cal, _ = self._cal()
+        if cal:
+            ev = CALENDAR.setdefault(cal, {}).get(req["id"])
+            if ev and ev.get("status") != "cancelled":
+                return self._send(409, {"error": "duplicate"})
+            if ev:   # 本物の Google カレンダーも、消した予定と同じ ID では作り直せない
+                return self._send(409, {"error": "duplicate (deleted)"})
+            CALENDAR[cal][req["id"]] = {**req, "status": "confirmed"}
+            print("calendar: insert", cal, req.get("summary"), flush=True)
+            return self._send(200, req)
         if self.path.endswith("/chat/completions"):
             msgs = req.get("messages", [])
             text = ""
@@ -54,9 +104,15 @@ class Handler(BaseHTTPRequestHandler):
                              "message": {"role": "assistant", "content": out}}],
                 "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}})
         elif ":generateContent" in self.path:
-            print("gemini: events", flush=True)
+            prompt = "".join(p.get("text", "") for c in req.get("contents", []) for p in c.get("parts", []))
+            if "カレンダーの決まり" in prompt:
+                out = judge(prompt)
+                print("gemini: judge", len(out), flush=True)
+            else:
+                out = EVENTS
+                print("gemini: events", flush=True)
             self._send(200, {"candidates": [{"content": {"parts": [
-                {"text": json.dumps(EVENTS, ensure_ascii=False)}]}}]})
+                {"text": json.dumps(out, ensure_ascii=False)}]}}]})
         else:
             self._send(404, {"error": self.path})
 
