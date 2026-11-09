@@ -1,18 +1,41 @@
 #!/usr/bin/env bash
 # 取り込み → AI の名付け → 予定の取り出し → 明日のお知らせ を、偽の AI で通しで確かめる。
 #   bash tests/smoke.sh
+#
+# 今の .env・書類・設定には触れない。ひな形を一時フォルダーに写し、別のプロジェクト名と
+# 別のポートで動かして、終わったら消す（動かしている本番の Paperless と並べて走らせてよい）。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+if [ -z "${SMOKE_IN_COPY:-}" ]; then
+  WORK=$(mktemp -d "${TMPDIR:-/tmp}/home-paper-ai-smoke.XXXXXX")
+  tar --exclude=./.git --exclude=./.env --exclude=./paperless --exclude=./paperless-gpt \
+      --exclude=./data --exclude=./config/service-account.json --exclude=./config/calendars.json \
+      -cf - . | tar -xf - -C "$WORK"
+  echo "テストは $WORK に写したひな形で動かします（今の .env・書類・設定には触れません）"
+  export SMOKE_IN_COPY=1 COMPOSE_PROJECT_NAME="smoke$$"
+  cleanup() {
+    (cd "$WORK" && docker compose -f compose.yml -f tests/compose.ci.yml down -v >/dev/null 2>&1 || true)
+    # コンテナが作ったファイルも消せるよう、コンテナの中から消す
+    docker run --rm -v "$WORK":/w docker.io/library/alpine:3 sh -c 'rm -rf /w/* /w/.[!.]* 2>/dev/null' || true
+    rmdir "$WORK" 2>/dev/null || true
+  }
+  trap cleanup EXIT
+  rc=0
+  bash "$WORK/tests/smoke.sh" || rc=$?
+  exit $rc
+fi
+
+PORT=${SMOKE_PORT:-18765}
 DC="docker compose -f compose.yml -f tests/compose.ci.yml"
-API=http://localhost:8000/api
+API=http://localhost:$PORT/api
 
 step() { echo; echo "=== $*"; }
 fail() { echo "NG: $*"; $DC logs --tail=80 webserver paperless-gpt mock || true; exit 1; }
 
 step "準備"
 cp tests/ci.env .env
-{ echo "PUID=$(id -u)"; echo "PGID=$(id -g)"; } >> .env
+{ echo "PUID=$(id -u)"; echo "PGID=$(id -g)"; echo "PAPERLESS_PORT=$PORT"; echo "PAPERLESS_GPT_PORT=$((PORT + 1))"; } >> .env
 mkdir -p paperless/consume/private data config
 $DC build tools
 
