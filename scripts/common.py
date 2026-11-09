@@ -12,7 +12,7 @@ PAPERLESS_URL = os.environ.get("PAPERLESS_URL", "http://localhost:8000").rstrip(
 PAPERLESS_TOKEN = os.environ.get("PAPERLESS_API_TOKEN", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
-# テストではAI の代役（モック） に向けるために差し替える
+# テストでは AI の代役（モック）に向けるために差し替える
 GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE", "https://generativelanguage.googleapis.com").rstrip("/")
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data"))
 
