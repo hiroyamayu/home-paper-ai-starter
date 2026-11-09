@@ -14,5 +14,5 @@ jobs:
       - uses: actions/checkout@v5
       - name: Python の文法を確かめる
         run: python3 -m py_compile scripts/*.py tests/*.py
-      - name: 取り込みからお知らせまで通しで確かめる（偽の AI）
+      - name: 取り込みからお知らせまで通しで確かめる（AI の代役（モック））
         run: bash tests/smoke.sh

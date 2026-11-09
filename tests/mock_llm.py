@@ -1,4 +1,4 @@
-"""テスト用の偽の AI と、偽の Google カレンダー。決まった答えを返すだけ。
+"""テスト用のAI と Google カレンダーの代役（モック）。決まった答えを返すだけ。
 
 - POST /v1/chat/completions                   … paperless-gpt から（OpenAI 互換）
 - POST /v1beta/models/<model>:generateContent … 予定の取り出し・カレンダーの判定から（Gemini）
