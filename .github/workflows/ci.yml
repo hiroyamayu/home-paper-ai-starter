@@ -16,6 +16,3 @@ jobs:
         run: python3 -m py_compile scripts/*.py tests/*.py
       - name: 取り込みからお知らせまで通しで確かめる（偽の AI）
         run: bash tests/smoke.sh
-      - name: 後片付け
-        if: always()
-        run: docker compose -f compose.yml -f tests/compose.ci.yml down -v

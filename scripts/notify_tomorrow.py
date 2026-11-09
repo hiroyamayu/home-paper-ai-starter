@@ -74,6 +74,7 @@ def send(title, message, url):
                 print(f"送れませんでした（{e}）。送り直します", file=sys.stderr)
         else:
             sys.exit("Pushover に送れませんでした")
+    print(f"Pushover で {len(users)} 人に送りました：{title}")
 
 
 def main():
