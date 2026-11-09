@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取り込み → AI の名付け → 予定の取り出し → 明日のお知らせ を、偽の AI で通しで確かめる。
+# 取り込み → AI の名付け → 予定の取り出し → 明日のお知らせ を、AI の代役（モック）で通しで確かめる。
 #   bash tests/smoke.sh
 #
 # 今の .env・書類・設定には触れない。ひな形を一時フォルダーに写し、別のプロジェクト名と
@@ -94,7 +94,7 @@ done
 [ "$HAS_AUTO" = "False" ] || fail "paperless-gpt-auto が外れない"
 echo "$J" | python3 -m json.tool | head -30
 
-step "ループしないか（30 秒待って、偽の AI が呼ばれ続けていないか）"
+step "ループしないか（30 秒待って、AI の代役（モック）が呼ばれ続けていないか）"
 before=$($DC logs mock | grep -c '^.*chat:' || true)
 sleep 30
 after=$($DC logs mock | grep -c '^.*chat:' || true)
@@ -139,7 +139,7 @@ assert d['title']!='校外学習のお知らせ', 'private の書類を AI が�
 print('OK：private の書類は AI に渡っていない（タイトル：' + d['title'] + '）')
 "
 
-step "カレンダーに書き込む（偽の Google カレンダー）"
+step "カレンダーに書き込む（Google カレンダーの代役）"
 cat > config/calendars.json <<'JSON'
 {"長女": "cal-chojo", "長男": "cal-chonan", "次男": "cal-jinan", "家族": "cal-family"}
 JSON
