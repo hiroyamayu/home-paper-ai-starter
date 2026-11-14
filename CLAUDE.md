@@ -21,3 +21,8 @@
 - Claude は作業用ブランチ（`claude/…`）から PR を出し、`main` へのマージは持ち主がする
 - コミットの作者は `hiroyamayu <302010674+hiroyamayu@users.noreply.github.com>`
 - 本を公開するときは、持ち主が実機で通しの確認をしてからタグ（`v1.0` など）を打ち、本からはタグのリンクを張る
+
+## Muse（モコ）との連携
+
+- Meta のパーソナルエージェント「モコ」と非同期で連携する。仕組みと引き継ぎ台帳は原稿側リポジトリ（zenn-content）の `notes/muse-collaboration.md` と `notes/muse-handoff.md` にある
+- このリポジトリに関わる状態や依頼も、連携ノート（zenn-content 側）に集約する
